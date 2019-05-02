@@ -13,7 +13,7 @@
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
 
-           SELECT json ASSIGN TO "\xampp\htdocs\cobolware\FileName.json"
+           SELECT json ASSIGN   TO lb-json
                   ORGANIZATION  IS LINE SEQUENTIAL
                   ACCESS MODE   IS SEQUENTIAL
                   FILE STATUS   IS fs-json.
@@ -75,8 +75,9 @@
               10 WS-DURAVEL         PIC  X(001).
 
        01  AREAS-DE-TRABALHO-1.
+           05 NM-CODIGO                   PIC  9(005) VALUE ZEROS.
            05 fs-json                     pic  x(002) value spaces.
-           05 lb-json                     pic  x(040) value
+           05 lb-json                     pic  x(050) value
               "\xampp\htdocs\cobolware\FileName.json".
            05 marcador                    pic  x(002) value spaces.
            05 WS-RETORNO-TELA             PIC  X(078).
@@ -88,6 +89,16 @@
            05 REGISTROS                   PIC  9(006) VALUE 0.
            05 FS-FileName                 PIC  X(002) VALUE "00".
            05 LB-FileName                 PIC  X(050) VALUE "FileName".
+           05 sys-sets.
+              10 filler                   pic  x(011) value
+                                                     "set codreg=".
+              10 sys-codreg               pic  9(005) value zeros.
+           05 return-code-ws              pic s9(8) comp-5.
+           05 filler                      redefines return-code-ws.
+               10 filler                  pic xx.
+               10 high-order-byte         pic s9 comp-5.
+               10 low-order-byte          pic s9 comp-5.
+
 
        LINKAGE SECTION.
 
@@ -135,7 +146,11 @@
 
            EVALUATE TRUE
                 WHEN READ-REG
-                    PERFORM 300-TRATA-AREA-LINK THRU 300-99-FIM
+                     if area-link(1:5) = 00000
+                        perform 400-listar-zero     thru 400-99-fim
+                     else
+                        PERFORM 300-TRATA-AREA-LINK THRU 300-99-FIM
+                     end-if
                 WHEN WRITE-REG
                     PERFORM 300-TRATA-AREA-LINK THRU 300-99-FIM
                 WHEN REWRITE-REG
@@ -277,11 +292,13 @@
 
            MOVE FileName-PRECO TO MASC-VALOR
            STRING marcador
-                 '"CODIGO":   ' '"' FileName-CODIGO    '",'
+                 '"CODIGO":'    '"' FileName-CODIGO    '",'
                  '"DESCRICAO":' '"' FileName-DESCRICAO '",'
-                 '"PRECO":    ' '"' MASC-VALOR         '",'
-                 '"TIPO":     ' '"' FileName-TIPO      '",'
-                 '"OPCOES":   ' '"' FileName-OPCOES    '"}'
+                 '"PRECO":'     '"' MASC-VALOR         '",'
+                 '"TIPO":'      '"' FileName-TIPO      '",'
+                 '"IMPORTADO":' '"' FileName-IMPORTADO '",'
+                 '"GARANTIA":'  '"' FileName-GARANTIA  '",'
+                 '"DURAVEL":'   '"' FileName-DURAVEL   '"}'
            DELIMITED BY SIZE INTO linha-json.
            EXEC COBOLware UTF8 FILE lb-json
                 UTF-8
@@ -319,6 +336,7 @@
                                        WS-IMPORTADO
                                        WS-GARANTIA
                                        WS-DURAVEL.
+           inspect ws-descricao replacing all "§" by " ".
            IF WS-CODIGO IS NUMERIC
               INITIALIZE FileName-REG
 
@@ -329,8 +347,23 @@
                          READ FileName ignore lock
                       END-perform
                  WHEN WRITE-REG
-                      perform 310-TRATAR-AREA-LINK thru 310-99-fim
-                      write FileName-REG
+                      initialize FileName-reg
+                      move 99999 to FileName-CODIGO
+                      start FileName key is less FileName-CHAVE
+                      READ FileName PREVIOUS RECORD IGNORE LOCK
+                      IF FS-FileName < "10"
+                         move FileName-CODIGO TO NM-CODIGO
+                         ADD  1               TO NM-CODIGO
+                         MOVE NM-CODIGO       TO WS-CODIGO
+                         perform 310-TRATAR-AREA-LINK thru 310-99-fim
+                         write FileName-REG
+                         initialize sys-codreg
+                         move FileName-CODIGO to sys-codreg
+                         display "XCODCLI" UPON ENVIRONMENT-NAME
+                         display WS-CODIGO UPON ENVIRONMENT-VALUE
+                         CALL "SYSTEM" USING     sys-sets
+                                       returning return-code-ws
+                      end-if
                  WHEN REWRITE-REG
                       MOVE WS-CODIGO TO FileName-CODIGO
                       PERFORM TEST AFTER UNTIL FS-FileName NOT = "9D"
@@ -371,14 +404,25 @@
            move WS-DURAVEL          to FileName-DURAVEL.
        310-99-FIM. EXIT.
 
+       400-listar-zero.
+           initialize FileName-reg
+           perform 090-INICIO-JSON      thru 090-99-FIM
+           PERFORM 100-DEVOLVE-REGISTRO THRU 100-99-FIM
+           PERFORM 110-FINALIZA-JSON    thru 110-99-FIM.
+       400-99-FIM. EXIT.
+
        900-FILE-STATUS.
-           OPEN OUTPUT json.
-           INITIALIZE linha-json.
-           String "FileStatus "
-                   FS-FileName
-                   delimited by size INTO linha-json.
-           WRITE linha-json.
-           close json.
+           initialize FileName-reg
+           if FS-FileName = "23"
+              move "Registro não encontrado." to FileName-DESCRICAO
+           else
+              String "FileStatus "
+                      FS-FileName
+                      delimited by size INTO FileName-DESCRICAO
+           end-if.
+           perform 090-INICIO-JSON      thru 090-99-FIM
+           PERFORM 100-DEVOLVE-REGISTRO THRU 100-99-FIM
+           PERFORM 110-FINALIZA-JSON    thru 110-99-FIM
            close FileName.
            go 000-99-FIM.
        900-99-FIM. EXIT.

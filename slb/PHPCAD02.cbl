@@ -136,7 +136,9 @@
                  '"DESCRICAO":' '"' FileName-DESCRICAO '",'
                  '"PRECO":    ' '"' MASC-VALOR         '",'
                  '"TIPO":     ' '"' FileName-TIPO      '",'
-                 '"OPCOES":   ' '"' FileName-OPCOES    '"}'
+                 '"IMPORTADO":' '"' FileName-IMPORTADO '",'
+                 '"GARANTIA": ' '"' FileName-GARANTIA  '",'
+                 '"DURAVEL":  ' '"' FileName-DURAVEL   '"}'
            DELIMITED BY SIZE INTO linha-json.
            EXEC COBOLware UTF8 FILE lb-json
                 UTF-8
