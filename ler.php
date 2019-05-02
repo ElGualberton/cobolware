@@ -26,6 +26,7 @@
 	async function buscarDados () {
 		try {
 			var localj = '<?php echo $arqJson; ?>'
+			console.log(localj)
 			obj = await fetch(localj).then(res => res.json()).then(data => data);
 			console.log('obj: ', obj);
 			console.log('Primeiro codigo ' + obj.FileName[0].CODIGO)
@@ -41,7 +42,7 @@
 				var cel2 = row.insertCell(1);
 				var cel3 = row.insertCell(2);
 				cel1.innerHTML = obj.FileName[i].CODIGO;
-				cel2.innerHTML = obj.FileName[i].DESCRICAO;
+				cel2.innerHTML = '<a href="manutencao.php?id=' + obj.FileName[i].CODIGO + '&tipo=A">' + obj.FileName[i].DESCRICAO + '</a>';
 				cel3.innerHTML = obj.FileName[i].PRECO;
 			}
 		} catch (error) {
